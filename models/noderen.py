@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 import numpy as np
-
+import math
 
 # import os
 
@@ -125,6 +125,91 @@ class ContractiveNodeREN(nn.Module):
             v = F.linear(xi, self.C1[i, :]) + F.linear(w, self.D11[i, :]) + F.linear(u, self.D12[i, :])
             w = w + (self.eye_mask_w[i, :] * self.act(v)).reshape(batch_size, 1, self.nq)
         return w
+
+    # simulation
+    def rollout(self, xi_init, u_log, T, train=False):
+        """
+        rollout REN for rollouts of the input
+        Args:
+            - xi_init of shape (batch_size, 1, nx)
+            - u_log of shape (batch_size, T, nu)
+            - T (int):  number of steps
+            # - ts of shape (T)
+        Return:
+            - xi_log of shape (batch_size, T, nx)
+        """
+        # initial state
+        if train:
+            xi_log = self._sim(xi_init, u_log, T)
+        else:
+            with torch.no_grad():
+                xi_log = self._sim(xi_init, u_log, T)
+        return xi_log
+
+    def _sim(self, xi_init, u_log, T):
+        xi = xi_init
+        xi_log = xi
+        for t in range(T):
+            xi_dot = self.forward(t=t, xi=xi, u=u_log[:, t:t+1, :])  # shape = (batch_size, 1, state_dim)
+            xi = xi + self.h * xi_dot
+            if t > 0:
+                xi_log = torch.cat((xi_log, xi), 1)
+        return xi_log
+
+
+class StableSystem(nn.Module):
+    # TODO: What about the h ?
+    def __init__(self, nx, ny, nu, nq, h, sigma=None, epsilon=0.01, bias=False):
+        """Model of a LTI system.
+        Args:
+            -nx (int): no. internal-states
+            -ny (int): no. output
+            -nu (int): no. inputs
+            -nq (int): useless
+            -sigma (string): useless
+            -epsilon (float): small (positive) scalar used to guarantee the matrices to be positive definitive.
+            -bias (bool, optional): useless
+        """
+        super().__init__()
+        # Dimensions of Inputs, Outputs, States
+
+        self.nx = nx  # no. internal-states
+        self.ny = ny  # no. output
+        self.nu = nu  # no. inputs
+        self.epsilon = epsilon
+        std = 0.5  # standard deviation used to draw randomly the initial weights of the model.
+
+        self.h = h
+
+        self.lambdas = - torch.rand(nx) * 5 - epsilon
+        self.V = torch.randn(nx,nx)
+        assert torch.linalg.matrix_rank(self.V) == nx
+        self.A = torch.matmul(self.V, torch.matmul(torch.diag(self.lambdas), self.V.transpose(0,1)))
+        while not max(torch.real(torch.linalg.eig(self.A)[0])) < -10*epsilon:
+            self.lambdas = - torch.rand(nx) * 5 - epsilon
+            self.V = torch.randn(nx,nx)
+            self.A = torch.matmul(self.V, torch.matmul(torch.diag(self.lambdas), self.V.transpose(0, 1)))
+
+        # Initialization of the Free Matrices:
+        self.B = nn.Parameter(torch.randn(nx, nu) * std)
+        self.C = nn.Parameter(torch.randn(ny, nx) * std)
+        self.D = nn.Parameter(torch.randn(ny, nu) * std)
+
+    def updateParameters(self):
+        pass
+
+    def forward(self, t, xi, u):
+        n_initial_states = xi.shape[0]
+        xi_ = F.linear(xi, self.A) + F.linear(u, self.B)
+        return xi_
+
+    def output(self, t, xi, u):
+        """
+        Calculates the output yt given the state xi and the input u.
+        """
+        n_initial_states = xi.shape[0]
+        yt = F.linear(xi, self.C) + F.linear(u, self.D22)
+        return yt
 
     # simulation
     def rollout(self, xi_init, u_log, T, train=False):
