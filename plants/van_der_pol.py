@@ -3,7 +3,7 @@ import torch.nn.functional as F
 
 
 class VanDerPol(torch.nn.Module):
-    def __init__(self, mu: float = 3., h: float = 0.01):
+    def __init__(self, mu: float = 1., h: float = 0.01):
         """
         Van der Pol oscillator in CT
         Args:
