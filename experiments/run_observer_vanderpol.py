@@ -3,21 +3,22 @@ from torch.func import jacrev, vmap
 import matplotlib.pyplot as plt
 
 from plants.van_der_pol import VanDerPol
-from models.noderen import ContractiveNodeREN
+from models.noderen import ContractiveNodeREN, StableSystem
 from models.static_NNs import FCNN
 
 
+plt.rcParams["text.usetex"] = True
 torch.manual_seed(0)
-T = 1000
+T = 2000
 state_dim = 2
 out_dim = 1
 batch_size = 1
-w_log = 0.01 * torch.randn(batch_size, T, state_dim)
-v_log = 0.01 * torch.randn(batch_size, T, out_dim)
+w_log = 0.05 * torch.randn(batch_size, T, state_dim) *0
+v_log = 0.05 * torch.randn(batch_size, T, out_dim) *0
 
 # Training parameters:
-epochs = 1000
-learning_rate = 5e-3
+epochs = 8000
+learning_rate = 2.5e-3
 
 sys = VanDerPol()
 
@@ -25,10 +26,10 @@ sys = VanDerPol()
 t = torch.linspace(0, T-1, T)
 x_init = torch.tensor([[1., 2.]]).repeat(batch_size, 1, 1)
 x_log, y_log = sys.rollout(x_init, w_log, v_log, T)
-plt.plot(t, x_log[0,:,:], label=["$x_1(t)$", "$x_2(t)$"])
+plt.plot(t, x_log[0,:,:], label=[r"$x_1(t)$", r"$x_2(t)$"])
 plt.legend()
 plt.show()
-plt.plot(t, y_log[0,:,:], label="$y(t)$")
+plt.plot(t, y_log[0,:,:], label=r"$y(t)$")
 plt.legend()
 plt.show()
 
@@ -36,15 +37,16 @@ plt.show()
 nx = 8
 ny = nx
 nu = sys.out_dim
-nq = 8
+nq = 4
 sys_z = ContractiveNodeREN(nx, ny, nu, nq, h=sys.h)
+# sys_z = StableSystem(nx, ny, nu, nq, h=sys.h)
 
-tau = FCNN(dim_in=ny, dim_out=sys.state_dim, dim_hidden=nq)
-sigma = FCNN(dim_in=sys.state_dim, dim_out=ny, dim_hidden=nq)
+tau = FCNN(dim_in=ny, dim_out=sys.state_dim, dim_hidden=nq*10)
+sigma = FCNN(dim_in=sys.state_dim, dim_out=ny, dim_hidden=nq*10)
 
 # For training:
 # Let's grid the state:
-n_points = int(401)  # number of points per dimension
+n_points = int(81)  # number of points per dimension
 
 # Grid  in[-2, 2] x [-2, 2]
 x1_vals = torch.linspace(-4, 4, n_points)
@@ -77,35 +79,63 @@ for epoch in range(epochs):
 
     loss1 = loss_1(torch.bmm(sys.dynamics(x_data), jacobian), sys_z(t, sigma(x_data), sys.output(x_data)))
     loss2 = loss_2(tau(sigma(x_data)), x_data)
-    loss = loss1 + loss2
-
+    loss = 10*loss1 + loss2
+    # if epoch % 1000 == 0 and epoch > 4100:
+    #     optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr'] / 2
     print("Epoch: %i \t--- Loss: %.2f \t---||--- Loss 1: %.2f \t---- Loss 2: %.2f"
           % (epoch, 1e6 * loss, 1e6 * loss1, 1e6 * loss2))
     loss.backward()
     optimizer.step()
     sys_z.updateParameters()
 
+for epoch in range(int(epochs/10)):
+    optimizer.zero_grad()
+
+    # Grid  in[-2, 2] x [-2, 2]
+    x1_vals = torch.rand(n_points) * 8 - 4
+    x2_vals = torch.rand(n_points) * 8 - 4
+    x1s, x2s = torch.meshgrid(x1_vals, x2_vals, indexing="ij")
+    # stack xs
+    x_data = torch.stack([x1s, x2s], dim=-1).reshape(-1, 1, 2)  # (batch_size, 1, 2)
+
+    jacobian = vmap(jacrev(sigma))(x_data).squeeze().transpose(1,2)
+
+    # print(torch.bmm(sys.dynamics(x_data), jacobian).shape)
+    # print(sys_z(t, sigma(x_data), sys.output(x_data)).shape)
+
+    with torch.no_grad():
+        zz = sigma(x_data).detach()
+    loss2 = loss_2(tau(zz), x_data)
+    loss = loss2
+
+    print("Epoch: %i \t--- Loss: %.2f \t---||--- Loss 1: %.2f \t---- Loss 2: %.2f"
+          % (epoch, 1e6 * loss, 1e6 * loss1, 1e6 * loss2))
+    loss.backward()
+    optimizer.step()
+    # sys_z.updateParameters()
+
 # Let's see how my observer works after training:
 
-# x_hat_log:
-xi_init = torch.randn(1,1,sys_z.nx)*2
-xi_log = sys_z.rollout(xi_init, y_log, T)
-x_hat_log = tau(xi_log)
-plt.figure()
-plt.subplot(2,1,1)
-plt.plot(t, x_log[0,:,0], label="$x_1(t)$")
-plt.plot(t, x_hat_log[0,:,0].detach(), label="$\hat{x}_1(t)$")
-plt.legend()
-plt.subplot(2,1,2)
-plt.plot(t, x_log[0,:,1], label="$x_2(t)$")
-plt.plot(t, x_hat_log[0,:,1].detach(), label="$\hat{x}_2(t)$")
-plt.legend()
-plt.show()
-
-plt.figure()
-plt.plot(t, y_log[0, :, 0], label="$y(t)$")
-plt.plot(t, sys.output(x_hat_log[0,:,:]).detach(), label="$\hat{y}(t)$")
-plt.legend()
-plt.show()
+for i in range(4):
+    # x_hat_log:
+    xi_init = torch.randn(1,1,sys_z.nx)*2
+    xi_log = sys_z.rollout(xi_init, y_log, T)
+    x_hat_log = tau(xi_log)
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(t, x_log[0,:,0], label=r"$x_1(t)$")
+    plt.plot(t, x_hat_log[0,:,0].detach(), label=r"$\hat{x}_1(t)$")
+    plt.legend()
+    plt.subplot(3,1,2)
+    plt.plot(t, x_log[0,:,1], label=r"$x_2(t)$")
+    plt.plot(t, x_hat_log[0,:,1].detach(), label=r"$\hat{x}_2(t)$")
+    plt.legend()
+    plt.subplot(3,1,3)
+    plt.plot(t, y_log[0, :, 0], label=r"$y(t)$")
+    plt.plot(t, sys.output(x_hat_log[0,:,:]).detach(), label=r"$\hat{y}(t)$")
+    plt.legend()
+    plt.show()
+    x_init = torch.rand(1,1,2)
+    x_log, y_log = sys.rollout(x_init, w_log, v_log, T)
 
 print("Hola")
