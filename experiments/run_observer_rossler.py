@@ -7,17 +7,19 @@ from models.noderen import ContractiveNodeREN
 from models.static_NNs import FCNN
 
 
+# NOT WORKING!
+plt.rcParams["text.usetex"] = True
 torch.manual_seed(0)
 T = 1000
-state_dim = 2
+state_dim = 3
 out_dim = 1
 batch_size = 1
-w_log = 0.01 * torch.randn(batch_size, T, state_dim)
-v_log = 0.01 * torch.randn(batch_size, T, out_dim)
+w_log = 0.01 * torch.randn(batch_size, T, state_dim) *0
+v_log = 0.01 * torch.randn(batch_size, T, out_dim) *0
 
 # Training parameters:
-epochs = 1000
-learning_rate = 5e-3
+epochs = 4000
+learning_rate = 2.5e-3
 
 sys = Rossler()
 
@@ -25,10 +27,10 @@ sys = Rossler()
 t = torch.linspace(0, T-1, T)
 x_init = torch.tensor([[1., 2., 1.5]]).repeat(batch_size, 1, 1)
 x_log, y_log = sys.rollout(x_init, w_log, v_log, T)
-plt.plot(t, x_log[0,:,:], label=["$x_1(t)$", "$x_2(t)$", "$x_3(t)$"])
+plt.plot(t, x_log[0,:,:], label=[r"$x_1(t)$", r"$x_2(t)$", r"$x_3(t)$"])
 plt.legend()
 plt.show()
-plt.plot(t, y_log[0,:,:], label="$y(t)$")
+plt.plot(t, y_log[0,:,:], label=r"$y(t)$")
 plt.legend()
 plt.show()
 
@@ -39,12 +41,12 @@ nu = sys.out_dim
 nq = 8
 sys_z = ContractiveNodeREN(nx, ny, nu, nq, h=sys.h)
 
-tau = FCNN(dim_in=ny, dim_out=sys.state_dim, dim_hidden=nq)
-sigma = FCNN(dim_in=sys.state_dim, dim_out=ny, dim_hidden=nq)
+tau = FCNN(dim_in=ny, dim_out=sys.state_dim, dim_hidden=nq*10)
+sigma = FCNN(dim_in=sys.state_dim, dim_out=ny, dim_hidden=nq*10)
 
 # For training:
 # Let's grid the state:
-n_points = int(401)  # number of points per dimension
+n_points = int(21)  # number of points per dimension
 
 # Grid  in[-2, 2] x [-2, 2]
 x1_vals = torch.linspace(-4, 4, n_points)
@@ -95,22 +97,22 @@ xi_log = sys_z.rollout(xi_init, y_log, T)
 x_hat_log = tau(xi_log)
 plt.figure()
 plt.subplot(3,1,1)
-plt.plot(t, x_log[0,:,0], label="$x_1(t)$")
-plt.plot(t, x_hat_log[0,:,0].detach(), label="$\hat{x}_1(t)$")
+plt.plot(t, x_log[0,:,0], label=r"$x_1(t)$")
+plt.plot(t, x_hat_log[0,:,0].detach(), label=r"$\hat{x}_1(t)$")
 plt.legend()
 plt.subplot(3,1,2)
-plt.plot(t, x_log[0,:,1], label="$x_2(t)$")
-plt.plot(t, x_hat_log[0,:,1].detach(), label="$\hat{x}_2(t)$")
+plt.plot(t, x_log[0,:,1], label=r"$x_2(t)$")
+plt.plot(t, x_hat_log[0,:,1].detach(), label=r"$\hat{x}_2(t)$")
 plt.legend()
 plt.subplot(3,1,3)
-plt.plot(t, x_log[0,:,2], label="$x_3(t)$")
-plt.plot(t, x_hat_log[0,:,2].detach(), label="$\hat{x}_3(t)$")
+plt.plot(t, x_log[0,:,2], label=r"$x_3(t)$")
+plt.plot(t, x_hat_log[0,:,2].detach(), label=r"$\hat{x}_3(t)$")
 plt.legend()
 plt.show()
 
 plt.figure()
-plt.plot(t, y_log[0, :, 0], label="$y(t)$")
-plt.plot(t, sys.output(x_hat_log[0,:,:]).detach(), label="$\hat{y}(t)$")
+plt.plot(t, y_log[0, :, 0], label=r"$y(t)$")
+plt.plot(t, sys.output(x_hat_log[0,:,:]).detach(), label=r"$\hat{y}(t)$")
 plt.legend()
 plt.show()
 
