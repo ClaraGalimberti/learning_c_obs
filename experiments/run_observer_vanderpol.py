@@ -180,23 +180,47 @@ for i in range(4):
 
     plt.figure()
     plt.subplot(2, 1, 1)
+    plt.title(r"$\xi(t)$")
     for j in range(nx):
-        plt.plot(t, xi_log[0, :, j], label=r"$\xi_{%i}(t)$" % j)
-    plt.legend()
+        plt.plot(t, xi_log[0, :, j], linewidth=0.5, label=r"$\xi_{%i}(t)$" % j)
+    # this is an inset axes over the main axes
+    a = plt.axes([.25, .58, .64, .13])
+    for j in range(nx):
+        plt.plot(t, xi_log[0, :, j], linewidth=0.5, label=r"$\xi_{%i}(t)$" % j)
+    a.set_ylim([-0.2, 0.2])
     plt.subplot(2, 1, 2)
-    plt.plot(t, y_log[0, :, 0], label=r"$y(t)$")
-    plt.legend()
+    plt.title(r"$\xi(t) - \sigma(x(t))$")
+    for j in range(nx):
+        plt.plot(t, xi_log[0, :, j] - sigma(x_log).detach()[0, :, 1], linewidth=0.5,
+                 label=r"$\xi_{%i}(t) - \sigma(x(t))$" % j)
+    a = plt.axes([.25, .16, .64, .13])
+    for j in range(nx):
+        plt.plot(t, xi_log[0, :, j] - sigma(x_log).detach()[0, :, 1], linewidth=0.5,
+                 label=r"$\xi_{%i}(t) - \sigma(x(t))$" % j)
+    a.set_ylim([-0.2, 0.2])
     plt.savefig(folder + "vanderpol_latent_after_training_%i.pdf" % i, format='pdf')
     plt.show()
 
     plt.figure()
     plt.subplot(2, 1, 1)
+    plt.title(r"$\xi(t)$")
     for j in range(nx):
-        plt.plot(t, xi_log_noisy[0, :, j], label=r"$\xi_{%i}(t)$" % j)
-    plt.legend()
+        plt.plot(t, xi_log_noisy[0, :, j], linewidth=0.5, label=r"$\xi_{%i}(t)$" % j)
+    # a = plt.axes([.25, .58, .64, .13])
+    # for j in range(nx):
+    #     plt.plot(t, xi_log_noisy[0, :, j], linewidth=0.5, label=r"$\xi_{%i}(t)$" % j)
+    # a.set_ylim([-0.4, 0.4])
     plt.subplot(2, 1, 2)
-    plt.plot(t, y_log_noisy[0, :, 0], label=r"$y(t)$")
-    plt.legend()
+    plt.title(r"$\xi(t) - \sigma(x(t))$")
+    for j in range(nx):
+        plt.plot(t, xi_log_noisy[0, :, j] - sigma(x_log_noisy).detach()[0, :, 1], linewidth=0.5,
+                 label=r"$\xi_{%i}(t) - \sigma(x(t))$" % j)
+    # a = plt.axes([.25, .16, .64, .13])
+    # for j in range(nx):
+    #     plt.plot(t, xi_log_noisy[0, :, j] - sigma(x_log_noisy).detach()[0, :, 1], linewidth=0.5,
+    #              label=r"$\xi_{%i}(t) - \sigma(x(t))$" % j)
+    # a.set_ylim([-0.4, 0.4])
     plt.savefig(folder + "vanderpol_noisy_latent_after_training_%i.pdf" % i, format='pdf')
     plt.show()
+
 print("Hola")
