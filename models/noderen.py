@@ -185,7 +185,7 @@ class StableSystem(nn.Module):
         self.V = torch.randn(nx,nx)
         assert torch.linalg.matrix_rank(self.V) == nx
         self.A = torch.matmul(self.V, torch.matmul(torch.diag(self.lambdas), self.V.transpose(0,1)))
-        while not max(torch.real(torch.linalg.eig(self.A)[0])) < -10*epsilon:
+        while not max(torch.real(torch.linalg.eig(self.A)[0])) < -100*epsilon:
             self.lambdas = - torch.rand(nx) * 5 - epsilon
             self.V = torch.randn(nx,nx)
             self.A = torch.matmul(self.V, torch.matmul(torch.diag(self.lambdas), self.V.transpose(0, 1)))
