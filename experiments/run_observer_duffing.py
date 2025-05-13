@@ -12,9 +12,6 @@ from models.static_NNs import FCNN
 plt.rcParams['text.usetex'] = True
 torch.manual_seed(0)
 
-# second_traning_phase = True
-second_traning_phase = False
-
 T = 1000
 state_dim = 2
 out_dim = 1
@@ -26,10 +23,7 @@ v_log = torch.zeros(batch_size, T, out_dim)
 w_log_noisy = 0.05 * torch.randn(batch_size, T, state_dim)
 v_log_noisy = 0.05 * torch.randn(batch_size, T, out_dim)
 
-if second_traning_phase:
-    folder = ''
-else:
-    folder = 'figs_no_second_phase/'
+folder = 'figs/'
 
 # Training parameters:
 epochs = 4000
@@ -101,33 +95,6 @@ for epoch in range(epochs):
     loss.backward()
     optimizer.step()
     sys_z.updateParameters()
-
-if second_traning_phase:
-    for epoch in range(int(epochs/10)):
-        optimizer.zero_grad()
-
-        # Grid  in[-2, 2] x [-2, 2]
-        x1_vals = torch.rand(n_points) * 8 - 4
-        x2_vals = torch.rand(n_points) * 8 - 4
-        x1s, x2s = torch.meshgrid(x1_vals, x2_vals, indexing="ij")
-        # stack xs
-        x_data = torch.stack([x1s, x2s], dim=-1).reshape(-1, 1, 2)  # (batch_size, 1, 2)
-
-        jacobian = vmap(jacrev(sigma))(x_data).squeeze().transpose(1,2)
-
-        # print(torch.bmm(sys.dynamics(x_data), jacobian).shape)
-        # print(sys_z(t, sigma(x_data), sys.output(x_data)).shape)
-
-        with torch.no_grad():
-            zz = sigma(x_data).detach()
-        loss2 = loss_2(tau(zz), x_data)
-        loss = loss2
-
-        print("Epoch: %i \t--- Loss: %.2f \t---||--- Loss 1: %.2f \t---- Loss 2: %.2f"
-              % (epoch, 1e6 * loss, 1e6 * loss1, 1e6 * loss2))
-        loss.backward()
-        optimizer.step()
-        # sys_z.updateParameters()
 
 # Let's see how my observer works after training:
 
