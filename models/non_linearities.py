@@ -42,16 +42,17 @@ class HamiltonianSIE(nn.Module):
     # Constraints:
     #   J(y,t) = J_1 = [ 0 I ; -I 0 ]
     # Discretization method: Semi-Implicit Euler
-    def __init__(self, n_layers, nf=4, t_end=0.5, random=True, bias=True):
+    def __init__(self, n_layers, dim_inputs, dim_small, t_end=0.5, random=True, bias=False):
         super().__init__()
 
         self.n_layers = n_layers
+        self.dim_small = dim_small
         self.h = t_end / self.n_layers
         self.act = nn.Tanh()
-        if not nf % 2 == 0:
-            raise ValueError('Number of features need to be and even number -- Currently it is %i' % nf)
-        self.nf = nf
-        self.half_state_dim = nf//2
+        if not dim_inputs % 2 == 0:
+            raise ValueError('Number of features need to be and even number -- Currently it is %i' % dim_inputs)
+        self.dim_inputs = dim_inputs
+        self.half_state_dim = dim_inputs // 2
         if random:
             k1 = 0.1 * torch.randn(self.half_state_dim, self.half_state_dim).repeat(self.n_layers, 1, 1)
             k2 = 0.1 * torch.randn(self.half_state_dim, self.half_state_dim).repeat(self.n_layers, 1, 1)
@@ -77,12 +78,34 @@ class HamiltonianSIE(nn.Module):
         if end is None:
             end = self.n_layers
         # x = x0.clone()
-        p, q = torch.split(x0.clone(), [self.half_state_dim, self.half_state_dim], dim=2)
+        p, q = torch.split(x0.clone(), [self.half_state_dim, self.half_state_dim], dim=-1)
         for j in range(ini, end):
             p = p - self.h * F.linear(self.act(F.linear(q, self.k2[j].transpose(0,1)) + self.b1[j]), self.k2[j])
             q = q + self.h * F.linear(self.act(F.linear(p, self.k1[j].transpose(0,1)) + self.b2[j]), self.k1[j])
-        x = torch.cat([p, q], dim=2)
+        x = torch.cat([p, q], dim=-1)
         return x
+
+    def forward_inverse(self, x_end, ini=0, end=None):
+        # the size of x_end is (sampleNumber, 1, nf)
+        if end is None:
+            end = self.n_layers
+        # x = x0.clone()
+        p, q = torch.split(x_end.clone(), [self.half_state_dim, self.half_state_dim], dim=-1)
+        for j in range(end-1, ini-1, -1):
+            q = q - self.h * F.linear(self.act(F.linear(p, self.k1[j].transpose(0, 1)) + self.b2[j]), self.k1[j])
+            p = p + self.h * F.linear(self.act(F.linear(q, self.k2[j].transpose(0,1)) + self.b1[j]), self.k2[j])
+        x = torch.cat([p, q], dim=-1)
+        return x
+
+    def lift(self, inputs):
+        zeros_shape = list(inputs.shape)
+        zeros_shape[-1] = self.dim_inputs - self.dim_small
+        inputs_ext = torch.cat([inputs, torch.zeros(zeros_shape)], dim=-1)
+        return inputs_ext
+
+    def delift(self, inputs):
+        output, _ = torch.split(inputs, [self.dim_small, self.dim_inputs - self.dim_small], dim=-1)
+        return output
 
 
 class FCNN(nn.Module):
