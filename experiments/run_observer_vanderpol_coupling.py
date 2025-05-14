@@ -7,7 +7,6 @@ from models.noderen import ContractiveNodeREN, StableSystem
 from models.non_linearities import CouplingLayer
 
 
-
 plt.rcParams["text.usetex"] = True
 torch.manual_seed(0)
 
