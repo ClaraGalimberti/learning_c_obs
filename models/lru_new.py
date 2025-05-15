@@ -22,7 +22,7 @@ class LRU_new(nn.Module):
 
         # set dimensions
         self.dim_internal = state_features
-        self.nx = state_features
+        self.nx = state_features * 2
         self.dim_in = in_features
         self.dim_out = out_features
         self.h = h
@@ -43,23 +43,25 @@ class LRU_new(nn.Module):
         self.C = nn.Parameter(torch.complex(C_re, C_im))
         # self.state = torch.complex(torch.zeros(state_features), torch.zeros(state_features))
 
-        H1 = torch.randn([self.dim_internal, self.dim_internal])
-        H2 = torch.randn([self.dim_internal, self.dim_internal])
-        rho = torch.cat([torch.cat([H1, -H2], dim=1),
-                       torch.cat([H2, H1], dim=1)], dim=0)
-        self.rho = rho / torch.norm(rho)
-        self.rhoinv = torch.inverse(self.rho)
+        self.H1 = nn.Parameter(torch.randn([self.dim_internal, self.dim_internal]))
+        self.H2 = nn.Parameter(torch.randn([self.dim_internal, self.dim_internal]))
 
         self.T_inv = ((1 / torch.sqrt(torch.tensor(2.0))) *
-                      torch.cat([torch.cat([torch.eye(state_features), torch.eye(state_features)], dim=1),
-                                 torch.cat([-1j * torch.eye(state_features), 1j * torch.eye(state_features)], dim=1)
-                                ], dim=0))  # shape (2n, 2n), complex
+                      torch.cat([torch.cat([torch.eye(self.dim_internal), torch.eye(self.dim_internal)], dim=1),
+                                 torch.cat([-1j * torch.eye(self.dim_internal), 1j * torch.eye(self.dim_internal)],
+                                           dim=1)
+                                 ], dim=0))  # shape (2n, 2n), complex
+
+        rho = torch.cat([torch.cat([self.H1, -self.H2], dim=1),
+                         torch.cat([self.H2, self.H1], dim=1)], dim=0)
+        self.rho = rho / torch.norm(rho)
+        self.rhoinv = torch.inverse(self.rho)
 
         self.P = torch.matmul(torch.complex(self.rho, torch.zeros_like(self.rho)), self.T_inv)
         self.Pinv = torch.inverse(self.P)
 
         # define trainable params
-        self.training_param_names = ['D', 'nu_log', 'theta_log', 'gamma_log', 'B', 'C']
+        self.training_param_names = ['D', 'nu_log', 'theta_log', 'gamma_log', 'B', 'C', 'H1', 'H2']
 
     def updateParameters(self):
         pass
@@ -74,6 +76,14 @@ class LRU_new(nn.Module):
             y_out (torch.Tensor): Output with (batch_size, 1, self.dim_out).
         """
         batch_size = u.shape[0]
+
+        rho = torch.cat([torch.cat([self.H1, -self.H2], dim=1),
+                         torch.cat([self.H2, self.H1], dim=1)], dim=0)
+        self.rho = rho / torch.norm(rho)
+        self.rhoinv = torch.inverse(self.rho)
+
+        self.P = torch.matmul(torch.complex(self.rho, torch.zeros_like(self.rho)), self.T_inv)
+        self.Pinv = torch.inverse(self.P)
 
         x_complex = torch.complex(x, torch.zeros_like(x))
         x_tilde = F.linear(x_complex, self.Pinv)
