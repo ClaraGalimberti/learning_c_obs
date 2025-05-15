@@ -45,12 +45,12 @@ plt.legend()
 plt.show()
 
 # Let's create the observer
-nx = 64
+nx = 4
 ny = nx
 nu = sys.out_dim
 nq = 4
-# sys_z = ContractiveNodeREN(nx, ny, nu, nq, h=sys.h)
-sys_z = LRU_new(in_features=nu, out_features=ny, state_features=nx//2, h=sys.h)
+sys_z = ContractiveNodeREN(nx, ny, nu, nq, h=sys.h)
+# sys_z = LRU_new(in_features=nu, out_features=ny, state_features=nx//2, h=sys.h)
 
 coup = CouplingLayer(dim_inputs=ny, dim_hidden=nq*20, dim_small=sys.state_dim)
 # tau = FCNN(dim_in=ny, dim_out=sys.state_dim, dim_hidden=nq*20)
