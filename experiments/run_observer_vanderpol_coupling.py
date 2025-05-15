@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 from plants.van_der_pol import VanDerPol
 from models.noderen import ContractiveNodeREN, StableSystem
-from models.non_linearities import CouplingLayer
+from models.non_linearities import CouplingLayer, HamiltonianSIE
 
 
 plt.rcParams["text.usetex"] = True
@@ -49,6 +49,7 @@ sys_z = ContractiveNodeREN(nx, ny, nu, nq, h=sys.h)
 # sys_z = StableSystem(nx, ny, nu, nq, h=sys.h)
 
 coup = CouplingLayer(dim_inputs=ny, dim_hidden=nq*2, dim_small=sys.state_dim)
+# coup = HamiltonianSIE(n_layers=32, dim_inputs=ny, dim_small=sys.state_dim)
 # tau = FCNN(dim_in=ny, dim_out=sys.state_dim, dim_hidden=nq*10)
 # sigma = FCNN(dim_in=sys.state_dim, dim_out=ny, dim_hidden=nq*10)
 
