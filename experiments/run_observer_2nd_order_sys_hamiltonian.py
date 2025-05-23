@@ -1,7 +1,6 @@
 import torch
 from torch.func import jacrev, vmap
 import matplotlib.pyplot as plt
-from torchdiffeq import odeint_adjoint as odeint
 
 from plants.second_order_system import SecondOrderSystem
 from models.noderen import ContractiveNodeREN
@@ -9,6 +8,7 @@ from models.lru_new import LRU_new
 from models.non_linearities import HamiltonianSIE
 
 
+# Working!
 plt.rcParams["text.usetex"] = True
 torch.manual_seed(0)
 
@@ -57,7 +57,7 @@ coup = HamiltonianSIE(n_layers=64, dim_inputs=ny, dim_small=sys.state_dim)
 
 # For training:
 # Let's grid the state:
-n_points = int(41)  # number of points per dimension
+n_points = int(5)  # number of points per dimension
 
 # Grid  in[-2, 2] x [-2, 2]
 x1_vals = torch.linspace(-4, 4, n_points)
