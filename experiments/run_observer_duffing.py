@@ -1,7 +1,6 @@
 import torch
 from torch.func import jacrev, vmap
 import matplotlib.pyplot as plt
-from torchdiffeq import odeint_adjoint as odeint
 
 from plants.duffing import ReverseDuffingOscillator
 from models.noderen import ContractiveNodeREN

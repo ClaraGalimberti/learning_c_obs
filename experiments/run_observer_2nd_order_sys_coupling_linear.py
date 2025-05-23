@@ -1,7 +1,6 @@
 import torch
 from torch.func import jacrev, vmap
 import matplotlib.pyplot as plt
-from torchdiffeq import odeint_adjoint as odeint
 
 from plants.second_order_system import SecondOrderSystem
 from models.noderen import ContractiveNodeREN
