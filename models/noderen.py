@@ -128,6 +128,7 @@ class ContractiveNodeREN(nn.Module):
 
     # simulation
     def rollout(self, xi_init, u_log, T, train=False):
+        # TODO: Remove T as input and obtain it from the u_log length
         """
         rollout REN for rollouts of the input
         Args:
