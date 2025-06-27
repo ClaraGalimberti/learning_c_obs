@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from matplotlib import pyplot as plt
 
 
 class VanDerPol(torch.nn.Module):
@@ -59,6 +60,7 @@ class VanDerPol(torch.nn.Module):
 
     # simulation
     def rollout(self, x_init, w_log, v_log, T, train=False):
+        # TODO: make w_log and v_log optional variables!
         """
         rollout for rollouts of the process noise
         Args:
@@ -90,3 +92,14 @@ class VanDerPol(torch.nn.Module):
                 x_log = torch.cat((x_log, x), 1)
                 y_log = torch.cat((y_log, self.output(x) + v_log[:, t:t+1, :]), 1)
         return x_log, y_log
+
+    # plot
+    def plot_trajectory(self, x_init, t_end, w=None, v=None):
+        if w is None:
+            w = torch.zeros(x_init.shape[0], t_end, self.state_dim)
+        if v is None:
+            v = torch.zeros(x_init.shape[0], t_end, self.out_dim)
+        x_log, y_log = self.rollout(x_init, w, v, t_end)
+        t = torch.linspace(0, t_end-1, t_end)
+        plt.plot(t, x_log[0, :, :], label=[r"$x_1(t)$", r"$x_2(t)$"])
+        plt.legend()
