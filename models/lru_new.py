@@ -66,11 +66,11 @@ class LRU_new(nn.Module):
     def updateParameters(self):
         pass
 
-    def forward(self, t, x, u, validation=False):
+    def forward(self, t, xi, u, validation=False):
         """
         Forward pass of SSM.
         Args:
-            x (torch.Tensor): Current real state with the size of (batch_size, 1, 2*self.dim_internal).
+            xi (torch.Tensor): Current real state with the size of (batch_size, 1, 2*self.dim_internal).
             u (torch.Tensor): Input with the size of (batch_size, 1, self.dim_in).
         Return:
             y_out (torch.Tensor): Output with (batch_size, 1, self.dim_out).
@@ -85,7 +85,7 @@ class LRU_new(nn.Module):
         self.P = torch.matmul(torch.complex(self.rho, torch.zeros_like(self.rho)), self.T_inv)
         self.Pinv = torch.inverse(self.P)
 
-        x_complex = torch.complex(x, torch.zeros_like(x))
+        x_complex = torch.complex(xi, torch.zeros_like(xi))
         x_tilde = F.linear(x_complex, self.Pinv)
         x_bar, x_bar_conj = torch.split(x_tilde, [self.dim_internal, self.dim_internal], dim=-1)
 
@@ -130,7 +130,7 @@ class LRU_new(nn.Module):
         xi = xi_init
         x_log = xi_init
         for t in range(T):
-            x_dot = self.forward(t=t, x=xi, u=u_log[:, t:t + 1, :])  # shape = (batch_size, 1, state_dim)
+            x_dot = self.forward(t=t, xi=xi, u=u_log[:, t:t + 1, :])  # shape = (batch_size, 1, state_dim)
             xi = xi + self.h * x_dot
             if t > 0:
                 x_log = torch.cat((x_log, xi), 1)
