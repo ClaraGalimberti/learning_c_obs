@@ -114,7 +114,7 @@ class FCNN(nn.Module):
 
         self.network = nn.Sequential(
             nn.Linear(dim_in, dim_hidden, bias=False), act(),
-            nn.Linear(dim_hidden, dim_hidden), act(),
+            #nn.Linear(dim_hidden, dim_hidden), act(),
             nn.Linear(dim_hidden, dim_out, bias=False)
         )
 
@@ -129,19 +129,23 @@ class CouplingLayer(nn.Module):
     def __init__(self, dim_inputs, dim_hidden, dim_small):
         super(CouplingLayer, self).__init__()
 
+        self.iter = 1
+
+        self.dim_small = dim_small
         self.dim_inputs = dim_inputs
         self.mask = torch.arange(0, dim_inputs) % 2  # alternating inputs
 
-        self.scale_net = FCNN(dim_in=dim_inputs, dim_out=dim_inputs, dim_hidden=dim_hidden)
-        self.translate_net = FCNN(dim_in=dim_inputs, dim_out=dim_inputs, dim_hidden=dim_hidden)
+        self.scale_net = []
+        self.translate_net = []
+        for i in range(self.iter):
+            self.scale_net.append(FCNN(dim_in=dim_inputs, dim_out=dim_inputs, dim_hidden=dim_hidden))
+            self.translate_net.append(FCNN(dim_in=dim_inputs, dim_out=dim_inputs, dim_hidden=dim_hidden))
 
-        nn.init.normal_(self.translate_net.network[0].weight.data, std=0.1)
-        nn.init.normal_(self.translate_net.network[2].weight.data, std=0.1)
+            nn.init.normal_(self.translate_net[i].network[0].weight.data, std=0.01)
+            nn.init.normal_(self.translate_net[i].network[2].weight.data, std=0.01)
 
-        nn.init.normal_(self.scale_net.network[0].weight.data, std=0.1)
-        nn.init.normal_(self.scale_net.network[2].weight.data, std=0.1)
-
-        self.dim_small = dim_small
+            nn.init.normal_(self.scale_net[i].network[0].weight.data, std=0.01)
+            nn.init.normal_(self.scale_net[i].network[2].weight.data, std=0.01)
 
     def lift(self, inputs):
         zeros_shape = list(inputs.shape)
@@ -154,23 +158,26 @@ class CouplingLayer(nn.Module):
         return output
 
     def forward(self, inputs):  # direct mode
-
         mask = self.mask
-        masked_inputs = inputs * mask
+        for i in range(self.iter):
+            masked_inputs = inputs * mask
 
-        log_s = self.scale_net(masked_inputs) * (1 - mask)
-        t = self.translate_net(masked_inputs) * (1 - mask)
+            log_s = self.scale_net[i](masked_inputs) * (1 - mask)
+            t = self.translate_net[i](masked_inputs) * (1 - mask)
 
-        s = torch.exp(log_s)
-        return inputs * s + t
+            s = torch.exp(log_s)
+            inputs = inputs * s + t
+        return inputs
 
     def forward_inverse(self, inputs):  # inverse mode
         mask = self.mask
-        masked_inputs = inputs * mask
+        for i in range(self.iter):
+            masked_inputs = inputs * mask
 
-        log_s = self.scale_net(masked_inputs) * (1 - mask)
-        t = self.translate_net(masked_inputs) * (1 - mask)
+            log_s = self.scale_net[self.iter-i-1](masked_inputs) * (1 - mask)
+            t = self.translate_net[self.iter-i-1](masked_inputs) * (1 - mask)
 
-        s = torch.exp(-log_s)
-        output =  (inputs - t) * s
-        return output
+            s = torch.exp(-log_s)
+            inputs =  (inputs - t) * s
+
+        return inputs

@@ -12,64 +12,68 @@ from plants.lorenz import Lorenz
 from plants.predator_prey import PredatorPrey
 from plants.van_der_pol import VanDerPol
 from models.noderen import ContractiveNodeREN
+from models.lru_new import LRU_new
 from models.non_linearities import CouplingLayer, HamiltonianSIE
+from losses.losses import OneStepLoss, MultiStepLoss
 
 
 
 # ----- 1. Hyperparameters ----------
 p = Params()
 
-p.t_end = 1000
+p.t_end = 1000*10
 p.state_dim = 2
 p.out_dim = 1
-p.batch_size = 1
+p.plot_batch_size = 1
 
 # Observer dimensions
-p.nx = 4
+p.nx = 6
 p.nq = 4
 
 # Learning hyperparameters
-p.seed = 0
-p.epochs = 4000
-p.learning_rate = 2.5e-3
+p.seed = 1
+p.epochs = 4000*4
+p.learning_rate = 5e-3
 
 # Griding for training
-p.n_points = 11  # number of points per dimension
-p.axis_limit = 6
+p.n_points = 50  # number of points per dimension
+p.axis_limit = 4
+p.batch = 50
 
 # Noise
-p.w_std = 0.04
-p.v_std = 0.04
+p.w_std = 10.
+p.v_std = 10.
 
 # ----- 2. Initialization ----------
 torch.manual_seed(p.seed)
 
 # ----- 3. Logger and saving folders ----------
 logger = WrapLogger()
+logger.info(p.text_to_print())
 figs_folder = os.path.join(ROOT_DIR, 'experiments','figs')
 os.makedirs(figs_folder, exist_ok=True)
 
-# ----- 4. Generate Noise ----------
-w = torch.zeros(p.batch_size, p.t_end, p.state_dim)
-v = torch.zeros(p.batch_size, p.t_end, p.out_dim)
-
-w_noisy = p.w_std * torch.randn(p.batch_size, p.t_end, p.state_dim)
-v_noisy = p.v_std * torch.randn(p.batch_size, p.t_end, p.out_dim)
-
-# ----- 5. Containers ----------
+# ----- 4. Containers ----------
 loss_log_1 = torch.zeros(p.epochs)
 loss_log_2 = torch.zeros(p.epochs)
 
-# ----- 6. System ----------
-# sys = SecondOrderSystem()
+# ----- 5. System ----------
+# sys = SecondOrderSystem(h=0.001)
 # sys = SystemSinCos()
-sys = ReverseDuffingOscillator()
+sys = ReverseDuffingOscillator(h=0.001)
 # sys = Lorenz()
 # sys = PredatorPrey()
 # sys = VanDerPol()
 
+# ----- 6. Generate Noise ----------
+w = torch.zeros(p.plot_batch_size, p.t_end, p.state_dim)
+v = torch.zeros(p.plot_batch_size, p.t_end, p.out_dim)
+
+w_noisy = p.w_std * sys.h * torch.randn(p.plot_batch_size, p.t_end, p.state_dim)
+v_noisy = p.v_std * sys.h * torch.randn(p.plot_batch_size, p.t_end, p.out_dim)
+
 # Let's plot a trajectory of the system
-x_init = torch.tensor([[1., 2.]]).repeat(p.batch_size, 1, 1)
+x_init = torch.tensor([[1., 2.]]).repeat(p.plot_batch_size, 1, 1)
 plt.figure()
 plt.subplot(1, 2, 1)
 sys.plot_trajectory(x_init, p.t_end)
@@ -81,8 +85,9 @@ plt.show()
 p.ny = p.nx
 p.nu = sys.out_dim
 sys_z = ContractiveNodeREN(p.nx, p.ny, p.nu, p.nq, h=sys.h)
+# sys_z = LRU_new(in_features=p.nu, out_features=p.ny, state_features=p.nx//2, h=sys.h)
 
-coup = CouplingLayer(dim_inputs=p.ny, dim_hidden=p.nq*20, dim_small=sys.state_dim)
+coup = CouplingLayer(dim_inputs=p.ny, dim_hidden=p.nq*40, dim_small=sys.state_dim)
 # coup = HamiltonianSIE(n_layers=32, dim_inputs=p.ny, dim_small=sys.state_dim)
 # tau = FCNN(dim_in=p.ny, dim_out=sys.state_dim, dim_hidden=p.nq*40)
 # sigma = FCNN(dim_in=sys.state_dim, dim_out=p.ny, dim_hidden=p.nq*40)
@@ -90,26 +95,31 @@ coup = CouplingLayer(dim_inputs=p.ny, dim_hidden=p.nq*20, dim_small=sys.state_di
 # ----- 8. Optimizer and losses -----
 optimizer = torch.optim.Adam(list(sys_z.parameters()) + list(coup.parameters()), lr=p.learning_rate)
 def lr_schedule(epoch):
-    if epoch < 0.5*p.epochs:
+    if epoch < 0.25*p.epochs:
         return 1.0
-    else:
+    elif epoch < 0.5*p.epochs:
         return 0.5
+    else:
+        return 0.25
 scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_schedule)
 loss_1 = torch.nn.MSELoss()
-loss_2 = torch.nn.MSELoss()
+# loss_2 = torch.nn.MSELoss()
+loss_2 = MultiStepLoss(sys, sys_z, coup)
+
+# ----- 9. Data for PINN ------
+x1_vals = torch.rand(p.n_points) * 2 * p.axis_limit - p.axis_limit
+x2_vals = torch.rand(p.n_points) * 2 * p.axis_limit - p.axis_limit
+x1s, x2s = torch.meshgrid(x1_vals, x2_vals, indexing="ij")
+# stack xs
+x_data_all = torch.stack([x1s, x2s], dim=-1).reshape(-1, 1, 2)  # ((2*p.n_points)**2, 1, 2)
 
 # ----- 9. Training -----
 if sys.state_dim != 2:
     raise NotImplementedError("The training is only implemented for 2D systems.")
 for epoch in range(p.epochs):
     optimizer.zero_grad()
-    # Grid  in[-2, 2] x [-2, 2]
-    x1_vals = torch.rand(p.n_points) * 2*p.axis_limit - p.axis_limit
-    x2_vals = torch.rand(p.n_points) * 2*p.axis_limit - p.axis_limit
-    x1s, x2s = torch.meshgrid(x1_vals, x2_vals, indexing="ij")
-    # stack xs
-    x_data = torch.stack([x1s, x2s], dim=-1).reshape(-1, 1, 2)  # (batch_size, 1, 2)
-
+    idx = torch.randperm(x_data_all.shape[0])[:p.batch]
+    x_data = x_data_all[idx]  # (p.batch, 1, 2)
     x_data_j = coup.lift(x_data)
     jacobian = vmap(jacrev(coup))(x_data_j).squeeze()
     jacobian = coup.delift(jacobian).transpose(1,2)
@@ -118,15 +128,17 @@ for epoch in range(p.epochs):
 
     loss1 = loss_1(torch.bmm(sys.dynamics(x_data), jacobian),
                    sys_z(t=0, xi=coup(coup.lift(x_data)), u=sys.output(x_data)))
-    loss2 = loss_2(coup.delift(coup.forward_inverse(coup(coup.lift(x_data)))),
-                   x_data)
-    # loss2 = torch.zeros(1)
-    loss = loss1 + 0.1*loss2
+    loss2 = loss_2(x_data) * 100
+    # loss2 = 0  # loss_2(coup.delift(coup.forward_inverse(coup(coup.lift(x_data)))), x_data)
+    loss = loss1 #+ loss2
     loss_log_1[epoch] = loss1.detach()
     loss_log_2[epoch] = loss2.detach()
     if epoch % 10 == 0:
-        print("Epoch: %4i \t--- Loss: %12.6f \t---||--- Loss 1: %12.6f \t---- Loss 2: %4.2f"
-              % (epoch, loss, loss1, loss2))
+        msg =  "Epoch: %4i \t--- " % epoch
+        msg += "Loss: %12.6f \t---||--- " % loss
+        msg += "Loss 1: %12.6f \t---- " % loss1
+        msg += "Loss 2: %8.6f" % loss2
+        logger.info(msg)
     loss.backward()
     optimizer.step()
     scheduler.step()
@@ -139,8 +151,9 @@ x, y = sys.rollout(x_init, 0*w_noisy, 0*v_noisy, p.t_end)
 x_noisy, y_noisy = sys.rollout(x_init, w_noisy, v_noisy, p.t_end)
 
 # x_hat_log:
-# TODO: set initialization at the original coordinates and transform
-xi_init = torch.randn(1,1,sys_z.nx)
+xi_init = coup.forward(coup.lift(x_init))
+# xi_init = coup.forward(coup.lift(torch.randn(1,1,sys.state_dim)))
+# xi_init = torch.randn(1,1,sys_z.nx)
 xi = sys_z.rollout(xi_init, y, p.t_end)
 x_hat = coup.delift(coup.forward_inverse(xi))
 plt.figure()
@@ -210,6 +223,7 @@ plt.show()
 # Let's also look at the Loss:
 plt.figure()
 plt.plot(torch.linspace(0, p.epochs-1, p.epochs), loss_log_1, label=r'$\ell_1$')
+plt.plot(torch.linspace(0, p.epochs-1, p.epochs), loss_log_2, label=r'$\ell_2$')
 plt.legend()
 ax = plt.gca()
 ax.set_yscale('log')

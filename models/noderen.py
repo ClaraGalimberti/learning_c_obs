@@ -30,7 +30,7 @@ class ContractiveNodeREN(nn.Module):
         self.nu = nu  # no. inputs
         self.nq = nq  # no. non-linear states
         self.epsilon = epsilon
-        std = 0.5  # standard deviation used to draw randomly the initial weights of the model.
+        std = 0.0005  # standard deviation used to draw randomly the initial weights of the model.
 
         self.h = h
 
