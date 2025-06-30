@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 
 
 class SecondOrderSystem(torch.nn.Module):
-    def __init__(self, k: float = 0.5, b: float = 0.2):
+    def __init__(self, k: float = 0.5, b: float = 0.2, h: float = 0.1):
         """
         Second order system in CT
         Args:
@@ -17,7 +17,7 @@ class SecondOrderSystem(torch.nn.Module):
 
         self.k = k
         self.b = b
-        self.h = 0.1
+        self.h = h
 
         A = torch.tensor([[0, 1.], [-self.k, -self.b]])
         self.register_buffer('A', A)
