@@ -18,6 +18,7 @@ class Rossler(torch.nn.Module):
         self.c = c
 
         self.h = h
+        self.name = "Rossler"
 
     def dynamics(self, x):
         assert x.shape[-1] == self.state_dim

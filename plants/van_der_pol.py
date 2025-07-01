@@ -17,6 +17,7 @@ class VanDerPol(torch.nn.Module):
         self.mu = mu
 
         self.h = h
+        self.name = "VanderPol"
 
     def dynamics(self, x):
         assert x.shape[-1] == self.state_dim

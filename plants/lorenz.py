@@ -19,6 +19,7 @@ class Lorenz(torch.nn.Module):
         self.r = r
 
         self.h = h
+        self.name = "Lorenz"
 
     def dynamics(self, x):
         assert x.shape[-1] == self.state_dim

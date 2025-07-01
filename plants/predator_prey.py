@@ -18,6 +18,7 @@ class PredatorPrey(torch.nn.Module):
         self.c2 = c2
 
         self.h = h
+        self.name = "PredatorPrey"
 
     def dynamics(self, x):
         assert x.shape[-1] == self.state_dim

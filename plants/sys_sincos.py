@@ -16,6 +16,7 @@ class SystemSinCos(torch.nn.Module):
         self.out_dim = 1
 
         self.h = h
+        self.name = "SinCosSystem"
 
     def dynamics(self, x):
         assert x.shape[-1] == self.state_dim

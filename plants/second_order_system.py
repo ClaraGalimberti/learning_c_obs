@@ -18,6 +18,7 @@ class SecondOrderSystem(torch.nn.Module):
         self.k = k
         self.b = b
         self.h = h
+        self.name = "Linear2ndOrderSystem"
 
         A = torch.tensor([[0, 1.], [-self.k, -self.b]])
         self.register_buffer('A', A)
