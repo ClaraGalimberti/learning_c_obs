@@ -173,7 +173,7 @@ plt.subplot(3,1,3)
 plt.plot(time, y[0, :, 0], label=r"$y(t)$")
 plt.plot(time, sys.output(x_hat[0,:,:]).detach(), label=r"$\hat{y}(t)$")
 plt.legend()
-plt.savefig(os.path.join(figs_folder, sys.name+"states_after_train.pdf"), format='pdf')
+plt.savefig(os.path.join(figs_folder, sys.name+"_states_after_train.pdf"), format='pdf')
 plt.show()
 #
 # Let's also plot the z-dynamics
@@ -186,7 +186,7 @@ plt.subplot(2,1,2)
 plt.plot(time, y[0, :, 0], label=r"$y(t)$")
 plt.plot(time, sys.output(x_hat[0,:,:]).detach(), label=r"$\hat{y}(t)$")
 plt.legend()
-plt.savefig(os.path.join(figs_folder, sys.name+"latent_after_train.pdf"), format='pdf')
+plt.savefig(os.path.join(figs_folder, sys.name+"_latent_after_train.pdf"), format='pdf')
 plt.show()
 
 # NOISE:
@@ -208,7 +208,7 @@ plt.subplot(3,1,3)
 plt.plot(time, y_noisy[0, :, 0], label=r"$y(t)$")
 plt.plot(time, sys.output(x_hat_noisy[0,:,:]).detach(), label=r"$\hat{y}(t)$")
 plt.legend()
-plt.savefig(os.path.join(figs_folder, sys.name+"states_noisy_after_train.pdf"), format='pdf')
+plt.savefig(os.path.join(figs_folder, sys.name+"_states_noisy_after_train.pdf"), format='pdf')
 plt.show()
 #
 # Let's also plot the z-dynamics
@@ -221,7 +221,7 @@ plt.subplot(2,1,2)
 plt.plot(time, y_noisy[0, :, 0], label=r"$y(t)$")
 plt.plot(time, sys.output(x_hat_noisy[0,:,:]).detach(), label=r"$\hat{y}(t)$")
 plt.legend()
-plt.savefig(os.path.join(figs_folder, sys.name+"latent_noisy_after_train.pdf"), format='pdf')
+plt.savefig(os.path.join(figs_folder, sys.name+"_latent_noisy_after_train.pdf"), format='pdf')
 plt.show()
 
 # Let's also look at the Loss:
@@ -231,7 +231,7 @@ plt.plot(torch.linspace(0, p.epochs-1, p.epochs), loss_log_2, label=r'$\ell_2$')
 plt.legend()
 ax = plt.gca()
 ax.set_yscale('log')
-plt.savefig(os.path.join(figs_folder + sys.name+"loss.pdf"), format='pdf')
+plt.savefig(os.path.join(figs_folder + sys.name+"_loss.pdf"), format='pdf')
 plt.show()
 
 print("Hola")
