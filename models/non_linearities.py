@@ -158,26 +158,36 @@ class CouplingLayer(nn.Module):
         return output
 
     def forward(self, inputs):  # direct mode
-        mask = self.mask
         for i in range(self.iter):
+            if i%2 == 0:
+                mask = self.mask
+            else:
+                mask = (1 - self.mask)
+
             masked_inputs = inputs * mask
 
-            log_s = self.scale_net[i](masked_inputs) * (1 - mask)
+            # log_s = self.scale_net[i](masked_inputs) * (1 - mask)
             t = self.translate_net[i](masked_inputs) * (1 - mask)
 
-            s = torch.exp(log_s)
+            # s = torch.exp(log_s)
+            s = torch.ones_like(inputs)
             inputs = inputs * s + t
         return inputs
 
     def forward_inverse(self, inputs):  # inverse mode
-        mask = self.mask
-        for i in range(self.iter):
+        for i in range(self.iter-1,-1,-1):
+            if i%2 == 0:
+                mask = self.mask
+            else:
+                mask = (1 - self.mask)
+
             masked_inputs = inputs * mask
 
-            log_s = self.scale_net[self.iter-i-1](masked_inputs) * (1 - mask)
-            t = self.translate_net[self.iter-i-1](masked_inputs) * (1 - mask)
+            # log_s = self.scale_net[i](masked_inputs) * (1 - mask)
+            t = self.translate_net[i](masked_inputs) * (1 - mask)
 
-            s = torch.exp(-log_s)
+            # s = torch.exp(-log_s)
+            s = torch.ones_like(inputs)
             inputs =  (inputs - t) * s
 
         return inputs
