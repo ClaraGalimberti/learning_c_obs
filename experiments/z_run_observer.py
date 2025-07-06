@@ -27,11 +27,11 @@ p.out_dim = 1
 p.plot_batch_size = 1
 
 # Observer dimensions
-p.nx = 6
+p.nx = 4
 p.nq = 4
 
 # Learning hyperparameters
-p.seed = 1
+p.seed = 0
 p.epochs = 4000*4
 p.learning_rate = 5e-3
 
@@ -41,8 +41,8 @@ p.axis_limit = 4
 p.batch = 50
 
 # Noise
-p.w_std = 10.
-p.v_std = 10.
+p.w_std = 10. /2
+p.v_std = 10. /2
 
 # ----- 2. Initialization ----------
 torch.manual_seed(p.seed)
@@ -59,10 +59,10 @@ loss_log_2 = torch.zeros(p.epochs)
 
 # ----- 5. System ----------
 # sys = SecondOrderSystem(h=0.001)
-# sys = SystemSinCos()
-sys = ReverseDuffingOscillator(h=0.001)
+sys = SystemSinCos(h=0.002)
+# sys = ReverseDuffingOscillator(h=0.001)
 # sys = Lorenz()
-# sys = PredatorPrey()
+# sys = PredatorPrey(h=0.002)
 # sys = VanDerPol()
 
 # ----- 6. Generate Noise ----------
@@ -87,8 +87,8 @@ p.nu = sys.out_dim
 sys_z = ContractiveNodeREN(p.nx, p.ny, p.nu, p.nq, h=sys.h)
 # sys_z = LRU_new(in_features=p.nu, out_features=p.ny, state_features=p.nx//2, h=sys.h)
 
-coup = CouplingLayer(dim_inputs=p.ny, dim_hidden=p.nq*40, dim_small=sys.state_dim)
-# coup = HamiltonianSIE(n_layers=32, dim_inputs=p.ny, dim_small=sys.state_dim)
+# coup = CouplingLayer(dim_inputs=p.ny, dim_hidden=p.nq*40, dim_small=sys.state_dim)
+coup = HamiltonianSIE(n_layers=32, dim_inputs=p.ny, dim_small=sys.state_dim)
 # tau = FCNN(dim_in=p.ny, dim_out=sys.state_dim, dim_hidden=p.nq*40)
 # sigma = FCNN(dim_in=sys.state_dim, dim_out=p.ny, dim_hidden=p.nq*40)
 
@@ -98,17 +98,21 @@ def lr_schedule(epoch):
     if epoch < 0.25*p.epochs:
         return 1.0
     elif epoch < 0.5*p.epochs:
-        return 0.5
+        return 0.1
     else:
-        return 0.25
+        return 0.01
 scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_schedule)
 loss_1 = torch.nn.MSELoss()
 # loss_2 = torch.nn.MSELoss()
 loss_2 = MultiStepLoss(sys, sys_z, coup)
 
 # ----- 9. Data for PINN ------
-x1_vals = torch.rand(p.n_points) * 2 * p.axis_limit - p.axis_limit
-x2_vals = torch.rand(p.n_points) * 2 * p.axis_limit - p.axis_limit
+if sys.name == "PredatorPrey":
+    bias = 0
+else:
+    bias = p.axis_limit
+x1_vals = torch.rand(p.n_points) * 2 * p.axis_limit - bias
+x2_vals = torch.rand(p.n_points) * 2 * p.axis_limit - bias
 x1s, x2s = torch.meshgrid(x1_vals, x2_vals, indexing="ij")
 # stack xs
 x_data_all = torch.stack([x1s, x2s], dim=-1).reshape(-1, 1, 2)  # ((2*p.n_points)**2, 1, 2)
@@ -151,7 +155,7 @@ x, y = sys.rollout(x_init, 0*w_noisy, 0*v_noisy, p.t_end)
 x_noisy, y_noisy = sys.rollout(x_init, w_noisy, v_noisy, p.t_end)
 
 # x_hat_log:
-xi_init = coup.forward(coup.lift(x_init))
+xi_init = coup.forward(coup.lift(x_init*(-2)))
 # xi_init = coup.forward(coup.lift(torch.randn(1,1,sys.state_dim)))
 # xi_init = torch.randn(1,1,sys_z.nx)
 xi = sys_z.rollout(xi_init, y, p.t_end)
@@ -169,7 +173,7 @@ plt.subplot(3,1,3)
 plt.plot(time, y[0, :, 0], label=r"$y(t)$")
 plt.plot(time, sys.output(x_hat[0,:,:]).detach(), label=r"$\hat{y}(t)$")
 plt.legend()
-plt.savefig(os.path.join(figs_folder,"linear_states_after_training.pdf"), format='pdf')
+plt.savefig(os.path.join(figs_folder, sys.name+"states_after_train.pdf"), format='pdf')
 plt.show()
 #
 # Let's also plot the z-dynamics
@@ -182,7 +186,7 @@ plt.subplot(2,1,2)
 plt.plot(time, y[0, :, 0], label=r"$y(t)$")
 plt.plot(time, sys.output(x_hat[0,:,:]).detach(), label=r"$\hat{y}(t)$")
 plt.legend()
-plt.savefig(os.path.join(figs_folder, "linear_latent_after_training.pdf"), format='pdf')
+plt.savefig(os.path.join(figs_folder, sys.name+"latent_after_train.pdf"), format='pdf')
 plt.show()
 
 # NOISE:
@@ -204,7 +208,7 @@ plt.subplot(3,1,3)
 plt.plot(time, y_noisy[0, :, 0], label=r"$y(t)$")
 plt.plot(time, sys.output(x_hat_noisy[0,:,:]).detach(), label=r"$\hat{y}(t)$")
 plt.legend()
-plt.savefig(os.path.join(figs_folder, "linear_noisy_states_after_training.pdf"), format='pdf')
+plt.savefig(os.path.join(figs_folder, sys.name+"states_noisy_after_train.pdf"), format='pdf')
 plt.show()
 #
 # Let's also plot the z-dynamics
@@ -217,7 +221,7 @@ plt.subplot(2,1,2)
 plt.plot(time, y_noisy[0, :, 0], label=r"$y(t)$")
 plt.plot(time, sys.output(x_hat_noisy[0,:,:]).detach(), label=r"$\hat{y}(t)$")
 plt.legend()
-plt.savefig(os.path.join(figs_folder, "linear_noisy_latent_after_training.pdf"), format='pdf')
+plt.savefig(os.path.join(figs_folder, sys.name+"latent_noisy_after_train.pdf"), format='pdf')
 plt.show()
 
 # Let's also look at the Loss:
@@ -227,7 +231,7 @@ plt.plot(torch.linspace(0, p.epochs-1, p.epochs), loss_log_2, label=r'$\ell_2$')
 plt.legend()
 ax = plt.gca()
 ax.set_yscale('log')
-plt.savefig(os.path.join(figs_folder + "loss.pdf"), format='pdf')
+plt.savefig(os.path.join(figs_folder + sys.name+"loss.pdf"), format='pdf')
 plt.show()
 
 print("Hola")
