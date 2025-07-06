@@ -9,7 +9,7 @@ from models.static_NNs import FCNN
 
 # NOT WORKING!
 
-plt.rcParams['text.usetex'] = True
+# plt.rcParams['text.usetex'] = True
 torch.manual_seed(0)
 T = 1000
 state_dim = 3

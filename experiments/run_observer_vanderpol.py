@@ -8,7 +8,7 @@ from models.static_NNs import FCNN
 
 
 
-plt.rcParams["text.usetex"] = True
+# plt.rcParams["text.usetex"] = True
 torch.manual_seed(0)
 
 T = 2000
