@@ -28,7 +28,7 @@ class MultiStepLoss(torch.nn.Module):
 
     def forward(self, x_init):
         steps = 2
-        x, y = self.sys.rollout(x_init, torch.zeros(x_init.shape[0],steps,2), torch.zeros(x_init.shape[0],steps,1), steps)
+        x, y = self.sys.rollout(x_init, torch.zeros(x_init.shape[0],steps,self.sys.state_dim), torch.zeros(x_init.shape[0],steps,1), steps)
         xi_init = self.coup.forward(self.coup.lift(x_init))
         xi = self.sys_z.rollout(xi_init, y, steps)
         x_hat = self.coup.delift(self.coup.forward_inverse(xi))

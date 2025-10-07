@@ -105,5 +105,5 @@ class Lorenz(torch.nn.Module):
             v = torch.zeros(x_init.shape[0], t_end, self.out_dim)
         x_log, y_log = self.rollout(x_init, w, v, t_end)
         t = torch.linspace(0, t_end-1, t_end)
-        plt.plot(t, x_log[0, :, :], label=[r"$x_1(t)$", r"$x_2(t)$"])
+        plt.plot(t, x_log[0, :, :], label=[r"$x_1(t)$", r"$x_2(t)$", r"$x_3(t)$"])
         plt.legend()
