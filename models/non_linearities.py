@@ -109,13 +109,13 @@ class HamiltonianSIE(nn.Module):
 
 
 class FCNN(nn.Module):
-    def __init__(self, dim_in, dim_out, dim_hidden, act=nn.Tanh):
+    def __init__(self, dim_in, dim_out, dim_hidden, act=nn.Tanh, bias=False):
         super(FCNN, self).__init__()
 
         self.network = nn.Sequential(
-            nn.Linear(dim_in, dim_hidden, bias=False), act(),
+            nn.Linear(dim_in, dim_hidden, bias=bias), act(),
             #nn.Linear(dim_hidden, dim_hidden), act(),
-            nn.Linear(dim_hidden, dim_out, bias=False)
+            nn.Linear(dim_hidden, dim_out, bias=bias)
         )
 
     def forward(self, x):
@@ -132,7 +132,7 @@ class CouplingLayer(nn.Module):
         self.iter = 1
 
         self.dim_small = dim_small
-        self.dim_inputs = dim_inputs
+        self.dim_inputs = dim_inputs  # dim latent space
         self.mask = torch.arange(0, dim_inputs) % 2  # alternating inputs
 
         self.scale_net = []
@@ -191,3 +191,37 @@ class CouplingLayer(nn.Module):
             inputs =  (inputs - t) * s
 
         return inputs
+
+
+class MappingT(nn.Module):
+    """
+    An implementation of T and tau
+    """
+    def __init__(self, dim_inputs, dim_hidden, dim_small):
+        super(MappingT, self).__init__()
+
+        self.dim_small = dim_small
+        self.dim_inputs = dim_inputs  # dim latent space
+
+        self.sigma = FCNN(dim_in=dim_small, dim_out=dim_inputs, dim_hidden=dim_hidden, bias=True)
+        self.tau = FCNN(dim_in=dim_inputs, dim_out=dim_small, dim_hidden=dim_hidden, bias=True)
+
+        # nn.init.normal_(self.sigma.network[0].weight.data, std=0.01)
+        # nn.init.normal_(self.sigma.network[2].weight.data, std=0.01)
+        #
+        # nn.init.normal_(self.tau.network[0].weight.data, std=0.01)
+        # nn.init.normal_(self.tau.network[2].weight.data, std=0.01)
+
+    def lift(self, inputs):
+        return inputs
+
+    def delift(self, inputs):
+        return inputs
+
+    def forward(self, inputs):  # direct mode
+        output = self.sigma(inputs)
+        return output
+
+    def forward_inverse(self, inputs):  # inverse mode
+        output = self.tau(inputs)
+        return output
