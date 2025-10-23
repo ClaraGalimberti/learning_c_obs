@@ -122,7 +122,6 @@ x_data_all = torch.stack(mesh, dim=-1).reshape(-1, 1, sys.state_dim)  # (N^d, 1,
 # ----- 8.2 Training P ----
 model_Px = P_local.learn_or_load_P(sys_name=sys.name, q=p.q, r=p.r, learn=False, test=True)
 
-from losses.loss_optimality_old import compute_l3_batch
 R = torch.eye(sys.out_dim) * p.r
 
 # ----- 8. Optimizer and losses -----
