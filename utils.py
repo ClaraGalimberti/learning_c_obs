@@ -2,6 +2,10 @@ import os
 import logging
 import json
 from datetime import datetime
+import torch
+import matplotlib.pyplot as plt
+import random
+import numpy as np
 
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -39,7 +43,8 @@ class WrapLogger:
 
 
 class Params:
-    """Class that contains all the hyperparameters of the running procedure
+    """
+    Class that contains all the hyperparameters of the running procedure
     Optionally, one can load some parameters through a json file
     Example:
     params = Params(json_path)
@@ -75,3 +80,37 @@ class Params:
         for key, value in self.__dict__.items():
             msg += f"  {key.ljust(max_key_length)} : {value} \n"
         return msg
+
+
+class Loss_Stats:
+    def __init__(self):
+        self.current = []
+        self.train = {'epochs': [], 'loss': []}
+        self.valid = {'epochs': [], 'loss': []}
+    def batch_step(self, loss):
+        self.current.append(loss)
+    def epoch_step(self, epoch, mode='train'):
+        mean = np.mean(self.current)
+        d = self.train if mode == 'train' else self.valid
+        is_best = len(d['loss']) == 0 or mean < np.min(d['loss'])
+        d['loss'].append(mean)
+        d['epochs'].append(epoch)
+        self.current = []
+        return mean, is_best
+    def render(self):
+        plt.figure()
+        plt.semilogy(self.train['epochs'], self.train['loss'])
+        plt.semilogy(self.valid['epochs'], self.valid['loss'])
+        plt.legend(['train', 'valid'])
+        plt.title("best losses: train %.3e valid %.3e"
+                  % (np.min(self.train['loss']), np.min(self.valid['loss'])))
+        plt.xlabel('epochs')
+        plt.show()
+
+
+def set_seed(seed):
+    torch.random.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
