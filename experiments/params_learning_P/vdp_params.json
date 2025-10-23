@@ -1,0 +1,10 @@
+{
+  "dataset": "VDP",
+  "name": "VDP_v1",
+  "epochs": 200,
+  "lr": 1e-3,
+  "batchsize": 100,
+  "seed": 0,
+  "n_points": 100,
+  "axis_limit": 4
+}
