@@ -46,7 +46,7 @@ p.v_std = 83. #10. /2
 # Params for local optimality
 p.q = 1.
 p.r = 1.
-p.e_std = 0.0001
+p.e_std = 0.001
 
 # ----- 2. Initialization ----------
 torch.manual_seed(p.seed)
