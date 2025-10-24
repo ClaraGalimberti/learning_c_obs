@@ -24,12 +24,6 @@ class LocalOptLoss(torch.nn.Module):
         if e_batch.ndim == 3 and e_batch.shape[1] == 1:
             e_batch = e_batch.squeeze(1)  # -> (B, m)
 
-        # Mark requires_grad True for x_batch (we need jacobians wrt x_hat which depends on x through tau(T(x)+e) ...)
-        # Important: do this BEFORE vmap. functorch disallows requires_grad_ inside vmapped function.
-        x_batch = x_batch.detach().requires_grad_(True)
-        e_batch = e_batch.detach().requires_grad_(True)
-        # e_batch = e_batch.detach()  # e.g. if e is small noise, and you don't need grads wrt e; if yes, set requires_grad_(True)
-
         # x_batch has dimension (B, n)
         # e_batch has dimension (B, m)
         # We want to apply vmap over the dimension of B. This is the dim 0 for both x_batch and e_batch
@@ -39,7 +33,6 @@ class LocalOptLoss(torch.nn.Module):
 
     def compute_loss_single(self, x, e):
         # x: shape (n,), e: shape (m,)
-        # No llamar a x.requires_grad_() aquí!
 
         z = self.T(x) + e  # (m,)
         x_hat = self.tau(z)  # (n,)
