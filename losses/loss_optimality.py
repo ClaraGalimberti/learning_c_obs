@@ -58,7 +58,8 @@ class LocalOptLoss(torch.nn.Module):
         Htau = hessian(self.tau)(self.T(x_hat))  # shape (n, m, m)
 
         # P^{-1}(x_hat)
-        P_inv = self.model_Pinv(x_hat)  # expected shape (n, n)
+        with torch.no_grad():
+            P_inv = self.model_Pinv(x_hat)  # expected shape (n, n)
 
         # First term: P_inv * Jh^T * R_inv * Jh * (x - x_hat)
         diff = x - x_hat  # (n,)
