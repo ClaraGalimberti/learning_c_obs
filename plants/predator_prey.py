@@ -20,7 +20,7 @@ class PredatorPrey(torch.nn.Module):
         self.h = h
         self.name = "PredatorPrey"
 
-        x_high = torch.tensor([8., 8])
+        x_high = torch.tensor([12., 12])
         x0_high = torch.tensor([7., 7])
         x0_low, x_low = x0_high*0, x_high*0
         self.axis_limit = {
