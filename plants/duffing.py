@@ -18,7 +18,7 @@ class ReverseDuffingOscillator(torch.nn.Module):
         self.name = "ReverseDuffingOscillator"
 
         x_high = torch.tensor([4., 4])
-        x0_high = torch.tensor([3.5, 3.5])
+        x0_high = torch.tensor([2., 2])
         x0_low, x_low = -x0_high, -x_high
         self.axis_limit = {
             "low": x_low,
