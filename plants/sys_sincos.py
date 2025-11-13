@@ -18,7 +18,7 @@ class SystemSinCos(torch.nn.Module):
         self.h = h
         self.name = "SinCosSystem"
 
-        x_high = torch.tensor([4., 4])
+        x_high = torch.tensor([5., 5])
         x0_high = torch.tensor([3.5, 3.5])
         x0_low, x_low = -x0_high, -x_high
         self.axis_limit = {
@@ -111,5 +111,6 @@ class SystemSinCos(torch.nn.Module):
             v = torch.zeros(x_init.shape[0], t_end, self.out_dim)
         x_log, y_log = self.rollout(x_init, w, v, t_end)
         t = torch.linspace(0, (t_end-1)*self.h, t_end)
-        plt.plot(t, x_log[0, :, :], label=[r"$x_1(t)$", r"$x_2(t)$"])
-        plt.legend()
+        for i in range(x_init.shape[0]):
+            plt.plot(t, x_log[i, :, :], label=[r"$x_1(t)$", r"$x_2(t)$"])
+        # plt.legend()
