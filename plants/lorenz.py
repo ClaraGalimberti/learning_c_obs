@@ -21,6 +21,16 @@ class Lorenz(torch.nn.Module):
         self.h = h
         self.name = "Lorenz"
 
+        x_high = torch.tensor([20., 20, 20])
+        x0_high = torch.tensor([18., 18, 18])
+        x0_low, x_low = -x0_high, -x_high
+        self.axis_limit = {
+            "low": x_low,
+            "high": x_high,
+            "x0low": x0_low,
+            "x0high": x0_high,
+        }
+
     def dynamics(self, x):
         assert x.shape[-1] == self.state_dim
         x1, x2, x3 = torch.split(x, [1, 1, 1], dim=-1)
@@ -104,6 +114,6 @@ class Lorenz(torch.nn.Module):
         if v is None:
             v = torch.zeros(x_init.shape[0], t_end, self.out_dim)
         x_log, y_log = self.rollout(x_init, w, v, t_end)
-        t = torch.linspace(0, t_end-1, t_end)
+        t = torch.linspace(0, (t_end-1)*self.h, t_end)
         plt.plot(t, x_log[0, :, :], label=[r"$x_1(t)$", r"$x_2(t)$", r"$x_3(t)$"])
         plt.legend()

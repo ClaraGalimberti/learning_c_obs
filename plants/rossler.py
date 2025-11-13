@@ -20,6 +20,16 @@ class Rossler(torch.nn.Module):
         self.h = h
         self.name = "Rossler"
 
+        x_high = torch.tensor([4., 4, 4])
+        x0_high = torch.tensor([3.5, 3.5, 3.5])
+        x0_low, x_low = -x0_high, -x_high
+        self.axis_limit = {
+            "low": x_low,
+            "high": x_high,
+            "x0low": x0_low,
+            "x0high": x0_high,
+        }
+
     def dynamics(self, x):
         assert x.shape[-1] == self.state_dim
         x1, x2, x3 = torch.split(x, [1, 1, 1], dim=-1)
