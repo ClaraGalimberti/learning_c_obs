@@ -29,7 +29,7 @@ p.nq = 8
 # Learning hyperparameters
 p.seed = 0
 p.epochs = 160
-p.learning_rate = 5e-3
+p.learning_rate = 5e-2
 
 # Griding for training
 p.n_points = 50000  # number of points where to evaluate PDE
@@ -39,7 +39,7 @@ p.batch = 1000
 # Noise
 p.w_std = 10. /2 *0
 p.v_std = 10. /2 *0 +83.
-p.t_end = 1000*10
+p.t_end = 10000
 p.plot_batch_size = 100
 
 # ----- 2. Initialization ----------
@@ -83,7 +83,7 @@ plt.show()
 # ----- 7. Observer -----
 p.ny = p.nx
 p.nu = sys.out_dim
-sys_z = ContractiveNodeREN(p.nx, p.ny, p.nu, p.nq, h=sys.h)
+sys_z = ContractiveNodeREN(p.nx, p.ny, p.nu, p.nq, h=sys.h, bias=True)
 # sys_z = LRU_new(in_features=p.nu, out_features=p.ny, state_features=p.nx//2, h=sys.h)
 
 # coup = CouplingLayer(dim_inputs=p.ny, dim_hidden=p.nq*40, dim_small=sys.state_dim)
@@ -142,17 +142,21 @@ for epoch in range(p.epochs):
     scheduler.step()
     is_best = epoch == 0 or loss_log_1[epoch] + loss_log_2[epoch] < (loss_log_1[:epoch] + loss_log_2[:epoch]).min()
     if epoch > 0 and is_best:
-        checkpoint = {'sys_z': sys_z.to('cpu').state_dict(),
-                      'coup': coup.to('cpu').state_dict()}
+        checkpoint = {'sys_z': sys_z.state_dict(),
+                      'coup': coup.state_dict()}
         torch.save(checkpoint, save_path)
     if epoch % 10 == 0:
         msg =  "Epoch: %4i \t--- " % epoch
         msg += "Loss: %12.6f \t---||--- " % ((loss_log_1[epoch] + loss_log_2[epoch]).detach()/n_batches)
         msg += "Loss 1: %12.6f \t---- " % (loss_log_1[epoch].detach()/n_batches)
         msg += "Loss 2: %12.6f \t---- " % (loss_log_2[epoch].detach()/n_batches)
-        msg += "Loss multistep: %8.6f \t---||--- " % (loss_log_multistep[epoch].detach()/n_batches)
+        msg += "Loss multistep: %12.6f \t---||--- " % (loss_log_multistep[epoch].detach()/n_batches)
         msg += "Elapsed time: %.2f" % (time.time() - tic)
         logger.info(msg)
+checkpoint = torch.load(save_path)
+sys_z.load_state_dict(checkpoint['sys_z'])
+coup.load_state_dict(checkpoint['coup'])
+sys_z.updateParameters()
 msg = "\t Model saved at %s" % save_path
 logger.info(msg)
 
@@ -187,7 +191,7 @@ mse = ((x - x_hat).detach()**2).mean(axis=0).mean(axis=-1)
 plt.plot(time, mse, label='MSE (on %i trajs)' % x.shape[0])
 plt.legend(loc="upper right")
 plt.yscale("log")
-plt.suptitle("nq=%i - T and tau: %i - min of MSE %.2e" % (p.nq, coup.tau.network[0].weight.shape[0], min(mse)))
+plt.suptitle("nq=%i - T and tau: %i - min of MSE %.2e" % (p.nq, p.n_tau, min(mse)))
 plt.tight_layout()
 plt.savefig(os.path.join(figs_folder, sys.name+"_states_after_train.pdf"), format='pdf')
 plt.show()
@@ -205,7 +209,7 @@ plt.subplot(sys_z.nx + 1, 1, sys_z.nx + 1)
 mse = ((xi - Tx)**2).mean(axis=0).mean(axis=-1)
 plt.semilogy(time, mse, label='MSE (on %i trajs)' % xi.shape[0])
 plt.legend(loc="upper right")
-plt.suptitle("nq=%i - T and tau: %i - min of MSE %.2e" % (p.nq, coup.tau.network[0].weight.shape[0], min(mse)))
+plt.suptitle("nq=%i - T and tau: %i - min of MSE %.2e" % (p.nq, p.n_tau, min(mse)))
 plt.tight_layout()
 plt.savefig(os.path.join(figs_folder, sys.name+"_latent_after_train.pdf"), format='pdf')
 plt.show()

@@ -10,7 +10,6 @@ import math
 
 
 class ContractiveNodeREN(nn.Module):
-    # TODO: What about the h ?
     def __init__(self, nx, ny, nu, nq, h, sigma="tanh", epsilon=0.01, bias=False):
         """Model of a contractive NodeREN.
         Args:
@@ -30,7 +29,7 @@ class ContractiveNodeREN(nn.Module):
         self.nu = nu  # no. inputs
         self.nq = nq  # no. non-linear states
         self.epsilon = epsilon
-        std = 0.0005  # standard deviation used to draw randomly the initial weights of the model.
+        std = 0.05  # standard deviation used to draw randomly the initial weights of the model
 
         self.h = h
 
@@ -44,18 +43,22 @@ class ContractiveNodeREN(nn.Module):
         self.Y1 = nn.Parameter(torch.randn(nx, nx) * std)
         self.B2 = nn.Parameter(torch.randn(nx, nu) * std)
         self.D12 = nn.Parameter(torch.randn(nq, nu) * std)
-        self.C2 = nn.Parameter(torch.randn(ny, nx) * std)
-        self.D21 = nn.Parameter(torch.randn(ny, nq) * std)
-        self.D22 = nn.Parameter(torch.randn(ny, nu) * std)
+        self.C2 = torch.eye(nx)
+        self.D21 = torch.zeros(ny, nq)
+        self.D22 = torch.zeros(ny, nu)
+        #self.C2 = nn.Parameter(torch.randn(ny, nx) * std)
+        #self.D21 = nn.Parameter(torch.randn(ny, nq) * std)
+        #self.D22 = nn.Parameter(torch.randn(ny, nu) * std)
         BIAS = bias
         if BIAS:
             self.bx = nn.Parameter(torch.randn(nx, 1) * std)
             self.bv = nn.Parameter(torch.randn(nq, 1) * std)
-            self.by = nn.Parameter(torch.randn(ny, 1) * std)
+            # self.by = nn.Parameter(torch.randn(ny, 1) * std)
         else:
             self.bx = torch.zeros(nx, 1)
             self.bv = torch.zeros(nq, 1)
-            self.by = torch.zeros(ny, 1)
+        self.by = torch.zeros(ny, 1)
+
         self.X = nn.Parameter(
             torch.randn(nx + nq, nx + nq) * std)
         # Initialization of the last Parameters:
@@ -116,13 +119,12 @@ class ContractiveNodeREN(nn.Module):
         return yt
 
     def calculate_w(self, t, xi, u):
-        # TODO: agregar los biases!
         batch_size = xi.shape[0]
         w = torch.zeros(batch_size, 1, self.nq)
         # update each row of w
         for i in range(self.nq):
             #  v is element i of v with dim (batch_size, 1)
-            v = F.linear(xi, self.C1[i, :]) + F.linear(w, self.D11[i, :]) + F.linear(u, self.D12[i, :])
+            v = F.linear(xi, self.C1[i, :]) + F.linear(w, self.D11[i, :]) + F.linear(u, self.D12[i, :]) + self.bv[i, :]
             w = w + (self.eye_mask_w[i, :] * self.act(v)).reshape(batch_size, 1, self.nq)
         return w
 
