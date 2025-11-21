@@ -251,6 +251,7 @@ def learn_or_load_P(sys_name, q, r, learn=False, test=False):
         # w_log = 5. * sys.h * torch.randn(n_traj, traj_len, sys.state_dim)
         # v_log = 5. * sys.h * torch.randn(n_traj, traj_len, sys.out_dim)
 
+        time = torch.linspace(0, (traj_len - 1) * sys.h, traj_len)
         t = torch.linspace(0, traj_len-1, traj_len)
         x_init = torch.tensor([[1., 2.]]).repeat(n_traj, 1, 1)
         x_log, y_log = sys.rollout(x_init, w_log, v_log, traj_len)
@@ -330,10 +331,10 @@ def learn_or_load_P(sys_name, q, r, learn=False, test=False):
         # -- plot P coeffs / Riccati residual
         plt.figure()
         plt.subplot(211)
-        plt.plot(ts[:-1], Ps.reshape((-1, sys.state_dim**2)))
+        plt.plot(time[:-1], Ps.reshape((-1, sys.state_dim**2)))
         plt.legend(['P coeffs'])
         plt.subplot(212)
-        plt.plot(ts[:-1], residuals)
+        plt.plot(time[:-1], residuals)
         plt.legend(['Riccati MSE'])
         plt.tight_layout()
         plt.show()
@@ -342,13 +343,14 @@ def learn_or_load_P(sys_name, q, r, learn=False, test=False):
         plt.figure()
         for i in range(model.x_dim):
             plt.subplot(model.x_dim + 1, 1, i + 1)
-            plt.plot(ts, xs[:, i], label='$x_%i$' % (i + 1))
-            plt.plot(ts, xs_obs[:, i], label='$hat x_%i$' % (i + 1))
+            plt.plot(time, xs[:, i], label='$x_%i$' % (i + 1))
+            plt.plot(time, xs_obs[:, i], label='$hat x_%i$' % (i + 1))
             if (sys_name == "Rossler" and i == 1) or (sys_name != "Rossler" and i == 0):
-                plt.plot(ts, ys, '--', label='y')
+                plt.plot(time, ys, '--', label='y')
             plt.legend()
         plt.subplot(model.x_dim + 1, 1, model.x_dim + 1)
-        plt.plot(ts, np.mean((xs - xs_obs)**2, axis=1))
+        plt.plot(time, np.mean((xs - xs_obs)**2, axis=1))
+        plt.yscale("log")
         plt.legend(['MSE'])
         plt.show()
 
