@@ -16,7 +16,8 @@ from models.noderen import ContractiveNodeREN
 from models.lru_new import LRU_new
 from models.non_linearities import CouplingLayer, HamiltonianSIE, MappingT
 from losses.losses import OneStepLoss, MultiStepLoss
-
+from losses.loss_optimality import LocalOptLoss
+from experiments import P_local
 
 # ----- 1. Hyperparameters ----------
 p = Params()
@@ -28,12 +29,18 @@ p.nq = 8
 
 # Learning hyperparameters
 p.seed = 0
-p.epochs = 160
+p.epochs = 160*2
 p.learning_rate = 5e-2
 
 # Griding for training
 p.n_points = 50000  # number of points where to evaluate PDE
 p.batch = 1000
+
+# Local optimality:
+p.train_local_optimal = True
+p.q = 1.
+p.r = 1.
+p.e_std = 0.001
 
 # Simulations:
 # Noise
@@ -54,6 +61,7 @@ os.makedirs(figs_folder, exist_ok=True)
 # ----- 4. Containers ----------
 loss_log_1 = torch.zeros(p.epochs)
 loss_log_2 = torch.zeros(p.epochs)
+loss_log_3 = torch.zeros(p.epochs)
 loss_log_multistep = torch.zeros(p.epochs)
 
 # ----- 5. System ----------
@@ -92,10 +100,16 @@ coup = MappingT(dim_inputs=p.ny, dim_hidden=p.n_tau, dim_small=sys.state_dim)
 
 # ----- 8. Optimizer and losses -----
 optimizer = torch.optim.Adam(list(sys_z.parameters()) + list(coup.parameters()), lr=p.learning_rate)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=p.epochs//4, gamma=.5)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=p.epochs//8, gamma=.5)
 loss_1 = torch.nn.MSELoss()
 loss_2 = torch.nn.MSELoss()
 loss_multistep = MultiStepLoss(sys, sys_z, coup)
+
+# P matrix
+if p.train_local_optimal:
+    model_Px = P_local.learn_or_load_P(sys_name=sys.name, q=p.q, r=p.r, learn=False, test=True)
+    R = torch.eye(sys.out_dim) * p.r
+    loss_3 = LocalOptLoss(sys, sys_z, coup, model_Px, p.r)
 
 # ----- 9. Data for PINN ------
 # generate data uniform random
@@ -118,6 +132,7 @@ for epoch in range(p.epochs):
     idxs = torch.randperm(n_samples)
     loss_log_1[epoch] = 0
     loss_log_2[epoch] = 0
+    loss_log_3[epoch] = 0
     loss_log_multistep[epoch] = 0
     for i in range(n_batches):
         optimizer.zero_grad()
@@ -126,32 +141,40 @@ for epoch in range(p.epochs):
         x_data_j = coup.lift(x_data)
         jacobian = vmap(jacrev(coup))(x_data_j).squeeze()
         jacobian = coup.delift(jacobian).transpose(1,2)
+        # QUESTION: the small noise should be added in z (latent space) or in x (state space)?
+        e_batch = p.e_std * torch.randn(p.batch, 1, sys_z.nx)
         loss1 = loss_1(torch.bmm(sys.dynamics(x_data), jacobian),
                        sys_z(t=0, xi=coup(coup.lift(x_data)), u=sys.output(x_data)))
         loss2 = loss_2(coup.delift(coup.forward_inverse(coup(coup.lift(x_data)))), x_data)
         loss_ms = loss_multistep(x_data) * 100
-        loss_reg = loss_1(coup.tau.network[-1].weight, torch.zeros_like(coup.tau.network[-1].weight))
-        loss = loss1 + loss2 + loss_reg
+        if p.train_local_optimal:
+            loss3 = loss_3(x_data, e_batch)
+        else:
+            loss3 = torch.tensor(0)
+        # loss_reg = loss_1(coup.tau.network[-1].weight, torch.zeros_like(coup.tau.network[-1].weight))
+        loss = loss1 + loss2 + loss3  #+ loss_reg
         loss.backward()
         optimizer.step()
         sys_z.updateParameters()
 
         loss_log_1[epoch] += loss1.detach()
         loss_log_2[epoch] += loss2.detach()
+        loss_log_3[epoch] += loss3.detach()
         loss_log_multistep[epoch] += loss_ms.detach()
     scheduler.step()
-    is_best = epoch == 0 or loss_log_1[epoch] + loss_log_2[epoch] < (loss_log_1[:epoch] + loss_log_2[:epoch]).min()
+    is_best = epoch == 0 or loss_log_1[epoch] + loss_log_2[epoch] + loss_log_3[epoch] < (loss_log_1[:epoch] + loss_log_2[:epoch] + loss_log_3[:epoch]).min()
     if epoch > 0 and is_best:
         checkpoint = {'sys_z': sys_z.state_dict(),
                       'coup': coup.state_dict()}
         torch.save(checkpoint, save_path)
     if epoch % 10 == 0:
-        msg =  "Epoch: %4i \t--- " % epoch
-        msg += "Loss: %12.6f \t---||--- " % ((loss_log_1[epoch] + loss_log_2[epoch]).detach()/n_batches)
-        msg += "Loss 1: %12.6f \t---- " % (loss_log_1[epoch].detach()/n_batches)
-        msg += "Loss 2: %12.6f \t---- " % (loss_log_2[epoch].detach()/n_batches)
-        msg += "Loss multistep: %12.6f \t---||--- " % (loss_log_multistep[epoch].detach()/n_batches)
-        msg += "Elapsed time: %.2f" % (time.time() - tic)
+        msg =  "Epoch: %3i \t--- " % epoch
+        msg += "Loss: %9.5f \t---||--- " % ((loss_log_1[epoch] + loss_log_2[epoch] + loss_log_3[epoch]).detach()/n_batches)
+        msg += "Loss 1: %9.5f \t---- " % (loss_log_1[epoch].detach()/n_batches)
+        msg += "Loss 2: %9.5f \t---- " % (loss_log_2[epoch].detach()/n_batches)
+        msg += "Loss 3: %9.5f \t---- " % (loss_log_3[epoch].detach() / n_batches)
+        msg += "Loss multistep: %9.5f \t---||--- " % (loss_log_multistep[epoch].detach()/n_batches)
+        msg += "Elapsed time: %6.2f" % (time.time() - tic)
         logger.info(msg)
 checkpoint = torch.load(save_path)
 sys_z.load_state_dict(checkpoint['sys_z'])
@@ -251,7 +274,7 @@ plt.plot(range(p.epochs), loss_log_2, label=r'$\ell_2$')
 plt.plot(range(p.epochs), loss_log_multistep, label=r'$\ell_3$')
 plt.legend()
 plt.yscale("log")
-plt.savefig(os.path.join(figs_folder + sys.name+"_loss.pdf"), format='pdf')
+plt.savefig(os.path.join(figs_folder, sys.name+"_loss.pdf"), format='pdf')
 plt.show()
 
 print("Hola")
